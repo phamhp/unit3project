@@ -153,7 +153,7 @@ FHIR.oauth2.ready().then(function (client) {
       } else {
         p.dia = 'undefined'
       }
-      _latestObs = weight[0];
+      var _latestObs = weight[0];
       console.log(weight);
       console.log("Latest weight:");
       console.log(_latestObs);
