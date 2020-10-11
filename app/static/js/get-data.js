@@ -99,6 +99,42 @@ function displayCheckupRecommendation(_string) {
   visit_list.innerHTML += "<li> " + _string + "</li>";
 }
 
+function render(data) {
+  console.log(data);
+  var margin = 100;
+  var svg = d3.select("svg"),
+    margin = 200,
+    width = svg.attr("width") - margin,
+    height = svg.attr("height") - margin
+
+
+  const yScale = d3.scaleLinear()
+    .domain([0, d3.max(data, d => d.total)])
+    .range([height, 0]);
+  var xScale = d3.scaleBand().range([0, width]).padding(0.4);
+  xScale.domain(data.map(function (d) { return d.year; }));
+
+  var g = svg.append("g")
+    .attr("transform", "translate(" + 100 + "," + 100 + ")");
+
+  g.append("g")
+    .attr("transform", "translate(-20," + height + ")")
+    .call(d3.axisBottom(xScale));
+
+  g.append("g")
+    .call(d3.axisLeft(yScale));
+
+  g.selectAll("bar")
+    .data(data)
+    .enter().append("rect")
+    .attr("class", "bar")
+    .attr("fill", "#ff0000")
+    .attr("x", function (d) { return xScale(d.year); })
+    .attr("y", function (d) { return yScale(d.total); })
+    .attr("width", 15)
+    .attr("height", function (d) { return height - yScale(d.total); });
+}
+
 //once fhir client is authorized then the following functions can be executed
 FHIR.oauth2.ready().then(function (client) {
 
@@ -261,85 +297,56 @@ FHIR.oauth2.ready().then(function (client) {
         var _period = _individual.period["start"];
         var _date = new Date(_period);
         var _year = _date.getFullYear();
-        if (_checkUpDict.hasOwnProperty(_year)) {
-          _count = _checkUpDict[_year];
+        var _ignore_year = new Date("2010").getFullYear();
+        if (_year > _ignore_year) {
+          if (_checkUpDict.hasOwnProperty(_year)) {
+            _count = _checkUpDict[_year];
+          } else {
+            _checkUpDict[_year] = 0;
+          }
+          if (_others.hasOwnProperty(_year)) {
+            _countOther = _others[_year];
+          } else {
+            _others[_year] = 0;
+          }
+          _isCheckupRecently = 1;
         } else {
-          _checkUpDict[_year] = 0;
-        }
-        if (_others.hasOwnProperty(_year)) {
-          _countOther = _others[_year];
-        } else {
-          _others[_year] = 0;
-        }
-
+          _isCheckupRecently = 0;
+        }// end if _year > ignore_year
 
         if (_text.includes(_string)) {
           _checkUpDict[_year] = _count + 1;
         } else {
           _others[_year] = _countOther + 1;
         }
-        //console.log(_individual);
-
-
-      });
-
-      for (var key in _checkUpDict) {
-        _checkUpArray.push({ "year": key, "total": _checkUpDict[key] });
-      }
-      for (var key in _others) {
-        _othersArray.push({ "year": key, "total": _others[key] });
-      }
-      if (!_checkUpDict.hasOwnProperty("2020")) {
-        console.log("No check up recently");
-        displayCheckupRecommendation("You haven't visited doctor in 2020");
-      } else {
-        console.log("Check up");
-        displayCheckupRecommendation("Good work! You are maintaining a good checkup routine");
-
-      }
-
-      var data = _checkUpArray.map(d => {
-        return {
-          year: d[Object.keys(d)[0]],
-          total: d[Object.keys(d)[1]]
+      });//end looping each record Encounter
+      if(_isCheckupRecently == 1){
+        for (var key in _checkUpDict) {
+          _checkUpArray.push({ "year": key, "total": _checkUpDict[key] });
         }
-      });
-
-      console.log(data);
-      var margin = 100;
-      var svg = d3.select("svg"),
-        margin = 200,
-        width = svg.attr("width") - margin,
-        height = svg.attr("height") - margin
-
-
-      const yScale = d3.scaleLinear()
-        .domain([0, d3.max(data, d => d.total)])
-        .range([height, 0]);
-      var xScale = d3.scaleBand().range([0, width]).padding(0.4);
-      xScale.domain(data.map(function (d) { return d.year; }));
-
-      var g = svg.append("g")
-        .attr("transform", "translate(" + 100 + "," + 100 + ")");
-
-      g.append("g")
-        .attr("transform", "translate(-20," + height + ")")
-        .call(d3.axisBottom(xScale));
-
-      g.append("g")
-        .call(d3.axisLeft(yScale));
-
-      g.selectAll("bar")
-        .data(data)
-        .enter().append("rect")
-        .attr("class", "bar")
-        .attr("fill", "#ff0000")
-        .attr("x", function (d) { return xScale(d.year); })
-        .attr("y", function (d) { return yScale(d.total); })
-        .attr("width", 15)
-        .attr("height", function (d) { return height - yScale(d.total); });
-
-
+        for (var key in _others) {
+          _othersArray.push({ "year": key, "total": _others[key] });
+        }
+        if (!_checkUpDict.hasOwnProperty("2020")) {
+          console.log("No check up recently");
+          displayCheckupRecommendation("You haven't visited doctor in 2020");
+        } else {
+          console.log("Check up");
+          displayCheckupRecommendation("Good work! You are maintaining a good checkup routine");
+  
+        }
+  
+        var data = _checkUpArray.map(d => {
+          return {
+            year: d[Object.keys(d)[0]],
+            total: d[Object.keys(d)[1]]
+          }
+        });
+        render(data);
+      }else {
+        displayCheckupRecommendation("No checkup records available in the last 10 years!");
+      }//end if else 
+      
     });
 
 }).catch(console.error);
