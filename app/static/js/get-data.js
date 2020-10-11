@@ -94,6 +94,11 @@ function displayObservation(obs) {
   height.innerHTML = obs.height;
 }
 
+//function to display info about checkup missing
+function displayCheckupRecommendation(_string) {
+  visit_list.innerHTML += "<li> " + _string + "</li>";
+}
+
 //once fhir client is authorized then the following functions can be executed
 FHIR.oauth2.ready().then(function (client) {
 
@@ -170,32 +175,32 @@ FHIR.oauth2.ready().then(function (client) {
     });
 
 
-    function getMedications(Records) {
+  function getMedications(Records) {
+    var _array = [];
+    Records.forEach(function (observation) {
+      // console.log(observation);
+      // console.log("=====");
+      // console.log(client.getPath(observation,"medicationCodeableConcept.text"));
+      _array.push(client.getPath(observation, "medicationCodeableConcept.text"));
+    });
+    //console.log(_array);
+    return _array;
+  }
+  var query2 = new URLSearchParams();
+  query2.set("patient", client.patient.id);
+  client.request("MedicationRequest?" + query2, {
+    pageLimit: 0,
+    flat: true
+  }).then(
+    function (ob) {
+      //console.log(ob);
+      //console.log(ob.medicationCodeableConcept);
       var _array = [];
-      Records.forEach(function (observation) {
-        // console.log(observation);
-        // console.log("=====");
-        // console.log(client.getPath(observation,"medicationCodeableConcept.text"));
-        _array.push(client.getPath(observation, "medicationCodeableConcept.text"));
+      _array = getMedications(ob);
+      _array.forEach(function (med) {
+        displayMedication(med);
       });
-      //console.log(_array);
-      return _array;
-    }
-    var query2 = new URLSearchParams();
-    query2.set("patient", client.patient.id);
-    client.request("MedicationRequest?" + query2, {
-      pageLimit: 0,
-      flat: true
-    }).then(
-      function (ob) {
-        //console.log(ob);
-        //console.log(ob.medicationCodeableConcept);
-        var _array = [];
-        _array = getMedications(ob);
-        _array.forEach(function (med) {
-          displayMedication(med);
-        });
-      });
+    });
   //update function to take in text input from the app and add the note for the latest weight observation annotation
   //you should include text and the author can be set to anything of your choice. keep in mind that this data will
   // be posted to a public sandbox
@@ -219,12 +224,7 @@ FHIR.oauth2.ready().then(function (client) {
       } else {
         _latestObs['note'] = _content;
       }
-      //   client.request({
-      //     url: `Observation/${_latestObs.id}`,
-      //     method: "PUT",
-      //     body: JSON.stringify(_latestObs),
-      //     headers: { "co1ntent-type": "application/json" }
-      // });
+
       client.update(_latestObs, _content);
     }
     console.log('after update');
@@ -237,5 +237,109 @@ FHIR.oauth2.ready().then(function (client) {
   //event listner when the add button is clicked to call the function that will add the note to the weight observation
   document.getElementById('add').addEventListener('click', addWeightAnnotation);
 
+
+  // display checkup bar chart using D3 libary
+  var _checkUpDict = {};
+  var _others = {};
+  var _yearArray = [];
+  var _checkUpArray = [];
+  var _othersArray = [];
+  const _string = "check up";
+  var query2 = new URLSearchParams();
+  var _isCheckupRecently = 0;
+  query2.set("patient", client.patient.id);
+  client.request("Encounter?" + query2, {
+    pageLimit: 0,
+    flat: true
+  }).then(
+    function (ob) {
+      ob.forEach(function (_individual) {
+        var _count = 0;
+        var _countOther = 0;
+        var _type = _individual.type;
+        var _text = _type[0]["text"];
+        var _period = _individual.period["start"];
+        var _date = new Date(_period);
+        var _year = _date.getFullYear();
+        if (_checkUpDict.hasOwnProperty(_year)) {
+          _count = _checkUpDict[_year];
+        } else {
+          _checkUpDict[_year] = 0;
+        }
+        if (_others.hasOwnProperty(_year)) {
+          _countOther = _others[_year];
+        } else {
+          _others[_year] = 0;
+        }
+
+
+        if (_text.includes(_string)) {
+          _checkUpDict[_year] = _count + 1;
+        } else {
+          _others[_year] = _countOther + 1;
+        }
+        //console.log(_individual);
+
+
+      });
+
+      for (var key in _checkUpDict) {
+        _checkUpArray.push({ "year": key, "total": _checkUpDict[key] });
+      }
+      for (var key in _others) {
+        _othersArray.push({ "year": key, "total": _others[key] });
+      }
+      if (!_checkUpDict.hasOwnProperty("2020")) {
+        console.log("No check up recently");
+        displayCheckupRecommendation("You haven't visited doctor in 2020");
+      } else {
+        console.log("Check up");
+        displayCheckupRecommendation("Good work! You are maintaining a good checkup routine");
+
+      }
+
+      var data = _checkUpArray.map(d => {
+        return {
+          year: d[Object.keys(d)[0]],
+          total: d[Object.keys(d)[1]]
+        }
+      });
+
+      console.log(data);
+      var margin = 100;
+      var svg = d3.select("svg"),
+        margin = 200,
+        width = svg.attr("width") - margin,
+        height = svg.attr("height") - margin
+
+
+      const yScale = d3.scaleLinear()
+        .domain([0, d3.max(data, d => d.total)])
+        .range([height, 0]);
+      var xScale = d3.scaleBand().range([0, width]).padding(0.4);
+      xScale.domain(data.map(function (d) { return d.year; }));
+
+      var g = svg.append("g")
+        .attr("transform", "translate(" + 100 + "," + 100 + ")");
+
+      g.append("g")
+        .attr("transform", "translate(-20," + height + ")")
+        .call(d3.axisBottom(xScale));
+
+      g.append("g")
+        .call(d3.axisLeft(yScale));
+
+      g.selectAll("bar")
+        .data(data)
+        .enter().append("rect")
+        .attr("class", "bar")
+        .attr("fill", "#ff0000")
+        .attr("x", function (d) { return xScale(d.year); })
+        .attr("y", function (d) { return yScale(d.total); })
+        .attr("width", 15)
+        .attr("height", function (d) { return height - yScale(d.total); });
+
+
+    });
 
 }).catch(console.error);

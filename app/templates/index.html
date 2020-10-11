@@ -66,13 +66,20 @@
           </div>
           <ul id="med_list"></ul>
         </div>
+        <div class="card">
+          <div class="title">
+            Checkup History
+          </div>
+          <ul id="visit_list"></ul>
+          <svg id="svg" width='500' height='300'></svg>
+        </div>
       </div>
 
     </main>
   </div>
-
+  <script src={{url_for('static', filename='js/d3/d3.min.js')}}></script>
   <script src={{url_for('static', filename='js/fhir-client.js')}}></script>
-  <script src={{url_for('static', filename='js/get-data.js')}}></script>
+  <script src={{url_for('static', filename='js/get-data-test.js')}}></script>
 
   <!-- uncomment below script and comment above script to switch for easy local testing -->
   <!-- <script src="./lib/js/get-data-test.js"></script> -->
