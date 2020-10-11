@@ -104,8 +104,8 @@ function render(data) {
   var svg = d3.select("svg");
   var margin = 30;
   var width = svg.attr("width") - margin;
-  var  height = svg.attr("height") - margin;
-
+  var height = svg.attr("height") - margin;
+  var _barWidth = 15;
 
   const yScale = d3.scaleLinear()
     .domain([0, d3.max(data, d => d.total)])
@@ -117,13 +117,15 @@ function render(data) {
     .attr("transform", "translate(" + 25 + "," + 0 + ")");
 
   g.append("g")
-    .attr("transform", "translate(-5," + height  + ")")
+    .attr("transform", "translate(-5," + height + ")")
     .call(d3.axisBottom(xScale));
 
   g.append("g")
     .call(d3.axisLeft(yScale))
-    .attr("transform", "translate(0," + 0  + ")");
-
+    .attr("transform", "translate(0," + 0 + ")");
+    if (d3.keys(data).length < 5){
+      _barWidth = 50;
+    }
   g.selectAll("bar")
     .data(data)
     .enter().append("rect")
@@ -131,7 +133,7 @@ function render(data) {
     .attr("fill", "#ff0000")
     .attr("x", function (d) { return xScale(d.year); })
     .attr("y", function (d) { return yScale(d.total); })
-    .attr("width", 15)
+    .attr("width", _barWidth)
     .attr("height", function (d) { return height - yScale(d.total); });
 }
 
@@ -275,79 +277,79 @@ FHIR.oauth2.ready().then(function (client) {
 
 
   var _checkUpDict = {};
-var _others = {};
-var _yearArray = [];
-var _checkUpArray = [];
-var _othersArray = [];
-const _string = "check up";
-var query2 = new URLSearchParams();
-var _isCheckupRecently = 0;
-var _ignore_year = new Date("2010");
-query2.set("patient", client.patient.id);
-client.request("Encounter?" + query2, {
-  pageLimit: 0,
-  flat: true
-}).then(
-  function (ob) {
-    ob.forEach(function (_individual) {
-      var _count = 0;
-      var _countOther = 0;
-      var _type = _individual.type;
-      var _text = _type[0]["text"];
-      var _period = _individual.period["start"];
-      var _date = new Date(_period);
-      var _year = _date.getFullYear();
-      if (_date > _ignore_year) {
-        //console.log(_year);
-        if (_checkUpDict.hasOwnProperty(_year)) {
-          _count = _checkUpDict[_year];
+  var _others = {};
+  var _yearArray = [];
+  var _checkUpArray = [];
+  var _othersArray = [];
+  const _string = "check up";
+  var query2 = new URLSearchParams();
+  var _isCheckupRecently = 0;
+  var _ignore_year = new Date("2010");
+  query2.set("patient", client.patient.id);
+  client.request("Encounter?" + query2, {
+    pageLimit: 0,
+    flat: true
+  }).then(
+    function (ob) {
+      ob.forEach(function (_individual) {
+        var _count = 0;
+        var _countOther = 0;
+        var _type = _individual.type;
+        var _text = _type[0]["text"];
+        var _period = _individual.period["start"];
+        var _date = new Date(_period);
+        var _year = _date.getFullYear();
+        if (_date > _ignore_year) {
+          //console.log(_year);
+          if (_checkUpDict.hasOwnProperty(_year)) {
+            _count = _checkUpDict[_year];
+          } else {
+            _checkUpDict[_year] = 0;
+          }
+          if (_others.hasOwnProperty(_year)) {
+            _countOther = _others[_year];
+          } else {
+            _others[_year] = 0;
+          }
+          if (_text.includes(_string)) {
+            _checkUpDict[_year] = _count + 1;
+          } else {
+            _others[_year] = _countOther + 1;
+          }
+          _isCheckupRecently = 1;
         } else {
-          _checkUpDict[_year] = 0;
+          _isCheckupRecently = 0;
+        }// end if _year > ignore_year
+
+
+      });//end looping each record Encounter
+      if (_isCheckupRecently == 1) {
+        for (var key in _checkUpDict) {
+          _checkUpArray.push({ "year": key, "total": _checkUpDict[key] });
         }
-        if (_others.hasOwnProperty(_year)) {
-          _countOther = _others[_year];
+        for (var key in _others) {
+          _othersArray.push({ "year": key, "total": _others[key] });
+        }
+        if (!_checkUpDict.hasOwnProperty("2020")) {
+          console.log("No check up recently");
+          displayCheckupRecommendation("You haven't visited doctor in 2020");
         } else {
-          _others[_year] = 0;
+          console.log("Check up");
+          displayCheckupRecommendation("Good work! You are maintaining a good checkup routine");
+
         }
-        if (_text.includes(_string)) {
-          _checkUpDict[_year] = _count + 1;
-        } else {
-          _others[_year] = _countOther + 1;
-        }
-        _isCheckupRecently = 1;
+
+        var data = _checkUpArray.map(d => {
+          return {
+            year: d[Object.keys(d)[0]],
+            total: d[Object.keys(d)[1]]
+          }
+        });
+        render(data);
       } else {
-        _isCheckupRecently = 0;
-      }// end if _year > ignore_year
+        displayCheckupRecommendation("No checkup records available in the last 10 years!");
+      }//end if else 
 
-      
-    });//end looping each record Encounter
-    if(_isCheckupRecently == 1){
-      for (var key in _checkUpDict) {
-        _checkUpArray.push({ "year": key, "total": _checkUpDict[key] });
-      }
-      for (var key in _others) {
-        _othersArray.push({ "year": key, "total": _others[key] });
-      }
-      if (!_checkUpDict.hasOwnProperty("2020")) {
-        console.log("No check up recently");
-        displayCheckupRecommendation("You haven't visited doctor in 2020");
-      } else {
-        console.log("Check up");
-        displayCheckupRecommendation("Good work! You are maintaining a good checkup routine");
-
-      }
-
-      var data = _checkUpArray.map(d => {
-        return {
-          year: d[Object.keys(d)[0]],
-          total: d[Object.keys(d)[1]]
-        }
-      });
-      render(data);
-    }else {
-      displayCheckupRecommendation("No checkup records available in the last 10 years!");
-    }//end if else 
-    
-  });
+    });
 
 }).catch(console.error);
